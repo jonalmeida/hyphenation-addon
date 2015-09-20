@@ -16,36 +16,37 @@ XPCOMUtils.defineLazyModuleGetter(this, "Log",
 
 let CONTENT_PATH_STR = 'content\/';
 
-var rootDir;
 
 // Define the "dump" function as a binding of the Log.d function so it specifies
 // the "debug" priority and a log tag.
 function dump(msg) {
-  Log.d("Browser", msg);
+    Log.d("Browser", msg);
+}
+
+function warn(msg) {
+    Log.e("Browser", msg);
 }
 
 function extractAll(nsiFileXpi, destinationDir) {
+    dump('Extracting hyphenation files..');
     try {
       zr.open(nsiFileXpi);
       var entries = zr.findEntries('*.dic');
       while (entries.hasMore()) {
         var entryPointer = entries.getNext();
         var entry = zr.getEntry(entryPointer);
-        dump('entryPointer: ' + entryPointer);
+        //dump('entryPointer: ' + entryPointer);
 
         if (!entry.isDirectory) {
             var outputFilePath = destinationDir.clone();
-            dump("The outputFilePath before append: " + outputFilePath.path);
             outputFilePath.append(getFileName(entryPointer));
-            dump("The outputFilePath after append: " + outputFilePath.path);
+            //dump("The outputFilePath after append: " + outputFilePath.path);
 
             zr.extract(entryPointer, outputFilePath);
-        } else {
-            dump('is directory, no stream to read');
         }
       }
     } catch (ex) {
-      console.warn('exception occured = ', ex);
+      warn('exception occured = ', ex);
       if (ex.name == 'NS_ERROR_FILE_NOT_FOUND') {
         Services.ww.activeWindow.alert('XPI at path does not exist!\n\nPath = ' + pathToXpiToRead);
       }
@@ -53,7 +54,6 @@ function extractAll(nsiFileXpi, destinationDir) {
       zr.close();
     }
 }
-
 
 function getFileName(path) {
     return path.substring(CONTENT_PATH_STR.length, path.length);
@@ -72,16 +72,6 @@ function createHyphenDir(dir) {
         if (ex.name == 'NS_ERROR_FILE_ALREADY_EXISTS') {
             dump("\'hyphenation\' nsiFile already exists");
         }
-
-        var logStr = "RootPath: ";
-        if (dir.isDirectory()) {
-            logStr += "This is a directory";
-        } else if (dir.isFile()) {
-            logStr += "This is a file";
-        } else {
-            logStr += "This is not a file or directory..";
-        }
-        dump(logStr);
     }
 
     dump("We are here and this is where we are: " + dir.path);
@@ -98,77 +88,8 @@ function getExtensionPath() {
     dir.append("extensions");
     dir.append("hyphenation-files@mozilla.org.xpi");
 
-    if (dir.isDirectory()) {
-        dump("This is a directory");
-    } else if (dir.isFile()) {
-        dump("This is a file");
-    } else {
-        dump("This is not a file or directory..");
-    }
-
     return dir;
 }
-
-let HyphenationFiles = {
-    classDescription: "An addon with all the hyphenation files to be installed in Fennec",
-    classId: Components.ID("{ed3b8fe0-5197-11e5-98bc-61114d5cf93c}"),
-
-    init: function() {
-        rootDir = Services.dirsvc.get("GreD", Ci.nsIFile);
-        rootDir.append("hyphenation");
-        try {
-            rootDir.create(Ci.nsIFile.DIRECTORY_TYPE, 0666);
-        } catch (ex) {
-            if (ex.name == 'NS_ERROR_FILE_ALREADY_EXISTS') {
-                dump("RootDir: \'hyphenation\' directory already exists");
-            }
-        }
-
-        var rootStr = "RootDir: ";
-        if (rootDir.isDirectory()) {
-            rootStr += "This is a directory";
-        } else if (rootDir.isFile()) {
-            rootStr += "This is a file";
-        } else {
-            rootStr += "This is not a file or directory..";
-        }
-        dump(rootStr);
-
-        dump("We are here and this is where we are: " + rootDir.path);
-
-
-        var chromeDir = Services.dirsvc.get("ProfD", Ci.nsIFile);
-
-        if (chromeDir) {
-            dump("We want to write into this directory: " + chromeDir.path);
-
-            if (chromeDir.isDirectory()) {
-                dump("This is a directory");
-            } else if (chromeDir.isFile()) {
-                dump("This is a file");
-            } else {
-                dump("This is not a file or directory..");
-            }
-
-            chromeDir.append("extensions");
-            chromeDir.append("hyphenation-files@mozilla.org.xpi");
-
-            if (chromeDir.isDirectory()) {
-                dump("This is a directory");
-            } else if (chromeDir.isFile()) {
-                dump("This is a file");
-            } else {
-                dump("This is not a file or directory..");
-            }
-
-            extractAll(chromeDir);
-        }
-    },
-
-    uninit: function() {
-        // Remove everything in `hyphenation/`
-    }
-};
 
 function startup(data, reason) {}
 
@@ -177,16 +98,16 @@ function shutdown(data, reason) {}
 function install(data, reason) {
     // Move the files to
     let hyphenPath = getRootHyphenationPath();
-    dump("hyphenPath is our root path we want to install shit in: " + hyphenPath.path);
     if (!hyphenPath.exists()) {
         createHyphenDir(hyphenPath);
     }
     let extPath = getExtensionPath();
-    dump("extPath is our root path we want to install shit from: " + extPath.path);
     extractAll(extPath, hyphenPath);
 }
 
 function uninstall(data, reason) {
     // Remove the files here
     // Find directory, and delete all.
+    let path = getRootHyphenationPath();
+    path.remove(true);
 }
